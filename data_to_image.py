@@ -1,0 +1,192 @@
+import os
+import sys
+import pandas as pd
+import matplotlib.pyplot as plt
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog, QComboBox, QLineEdit, QPlainTextEdit
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5 import QtCore 
+
+class EmittingStream(QtCore.QObject):
+    text_written = pyqtSignal(str)
+
+    def write(self, text):
+        self.text_written.emit(str(text))
+
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('CPU各进程占用数据图标生成工具！')
+
+        # 创建标签
+        self.input_label = QLabel('存放数据的文件夹:')
+        self.output_label = QLabel('输出图像:')
+        self.dpi_label = QLabel('DPI:')
+        self.start_time_label = QLabel('开始时间:')
+        self.end_time_label = QLabel('结束时间:')
+
+        # 创建按钮
+        self.input_button = QPushButton('Select Input Folder')
+        self.output_button = QPushButton('Select Output File')
+        self.run_button = QPushButton('启动！')
+
+        # 创建下拉框和输入框
+        self.dpi_combobox = QComboBox()
+        self.dpi_combobox.addItems(['100', '200', '300', '400', '500', '600', '700', '800', '900', '1000'])
+        self.dpi_combobox.setCurrentIndex(3)  # 默认选择 400 DPI
+
+        self.start_time_input = QLineEdit('15:30:00')
+        self.end_time_input = QLineEdit('15:32:00')
+
+        # 创建文本框
+        self.output_textbox = QPlainTextEdit()
+        self.output_textbox.setReadOnly(True)  # 设置为只读模式
+
+        # 创建布局
+        layout = QVBoxLayout()
+        layout.addWidget(self.input_label)
+        layout.addWidget(self.input_button)
+        layout.addWidget(self.output_label)
+        layout.addWidget(self.output_button)
+        layout.addWidget(self.dpi_label)
+        layout.addWidget(self.dpi_combobox)
+        layout.addWidget(self.start_time_label)
+        layout.addWidget(self.start_time_input)
+        layout.addWidget(self.end_time_label)
+        layout.addWidget(self.end_time_input)
+        layout.addWidget(self.run_button)
+        layout.addWidget(self.output_textbox)
+
+        self.setLayout(layout)
+
+        # 为按钮添加点击事件
+        self.input_button.clicked.connect(self.select_input_folder)
+        self.output_button.clicked.connect(self.select_output_file)
+        self.run_button.clicked.connect(self.run_code)
+
+    def select_input_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, 'Select Input Folder')
+        self.input_label.setText(f'Input Folder: {folder_path}')
+
+    def select_output_file(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, 'Select Output File', filter='PNG Files (*.png)')
+        self.output_label.setText(f'Output File: {file_path}')
+
+    def run_code(self):
+        input_folder = self.input_label.text().split(': ')[-1]
+        output_file = self.output_label.text().split(': ')[-1]
+        dpi = int(self.dpi_combobox.currentText())
+        start_time = self.start_time_input.text()
+        end_time = self.end_time_input.text()
+
+        # 清空文本框内容
+        self.output_textbox.clear()
+
+        # 将 print 输出重定向到文本框
+        original_stdout = sys.stdout
+        sys.stdout = EmittingStream(text_written=self.on_text_written)
+
+        try:
+            # 运行第一个代码，将中间文件保存为默认路径
+            intermediate_file = 'intermediate_data.xlsx'
+
+            # 以下为第一个代码的内容
+            data = pd.DataFrame(columns=['Time', 'Data1', 'Data2', 'File_Name'])
+
+            for filename in os.listdir(input_folder):
+                if filename.endswith('.txt') and 'load' not in filename and 'idle' not in filename:
+                    file_path = os.path.join(input_folder, filename)
+                    try:
+                        df = pd.read_csv(file_path, sep=' ', names=['Time', 'Data1', 'Data2'])
+                        file_name = os.path.splitext(filename)[0]
+                        df['File_Name'] = file_name
+                        data = pd.concat([data, df], ignore_index=True)
+                    except Exception as e:
+                        print(f"Error processing file {filename}: {str(e)}")
+
+            data.to_excel(intermediate_file, index=False)
+            print(f"Intermediate data saved as {intermediate_file}")
+
+            # 运行第二个代码
+            df = pd.read_excel(intermediate_file)
+
+            # 以下为第二个代码的内容
+            df.dropna(subset=['Time', 'Data1', 'Data2', 'File_Name'], inplace=True)
+            df['Time'] = pd.to_datetime(df['Time'], format='%H:%M:%S')
+
+            df = df[(df['Time'].dt.time >= pd.to_datetime(start_time).time()) & 
+                    (df['Time'].dt.time <= pd.to_datetime(end_time).time())]
+
+            df['Data1'] = df['Data1'].astype(float)
+            # df = df[df['Data1'].diff().abs() <= 10]
+
+            average_data1 = df.groupby('File_Name')['Data1'].transform('mean')
+            median_data1 = df.groupby('File_Name')['Data1'].transform('median')
+            df['Average_Data1'] = average_data1
+            df['Median_Data1'] = median_data1
+            # df = df[(df['Average_Data1'] >= 5) & (df['Data1'] >= 10)]
+            df = df[df['Average_Data1'] >= 5]
+            df.sort_values(by='Average_Data1', ascending=False, inplace=True)
+
+            dpi = 500
+            fig, ax = plt.subplots(figsize=(50, 5), dpi=dpi)
+            max_values = []
+
+            colors = [
+                '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#8B00FF',
+                '#800000', '#FF4500', '#FFD700', '#008000', '#000080', '#483D8B', '#9932CC',
+                '#8B0000', '#FFA500', '#FFD700', '#006400', '#00008B', '#6A5ACD'
+            ]
+
+            for i, (label, group) in enumerate(df.groupby('File_Name')):
+                group = group.sort_values(by='Time')
+                x_values = group['Time']
+                y_values = group['Data1']
+
+                ax.plot(x_values, y_values, marker='o', markersize=1, label=f'{label} (Avg: {group["Average_Data1"].iloc[0]:.2f}, Median: {group["Median_Data1"].iloc[0]:.2f})', linewidth=0.5, color=colors[i % len(colors)])
+
+                max_value_index = y_values.idxmax()
+                max_value = y_values[max_value_index]
+                max_time = x_values[max_value_index]
+
+                offset = i * 2.6
+                ax.annotate(label, xy=(max_time, max_value), xytext=(max_time, max_value + 10 + offset), arrowprops=dict(arrowstyle='->'))
+
+                max_values.append((label, max_time, max_value))
+
+            plt.xlabel('Time')
+            plt.ylabel('CPU%')
+            plt.title('ACU_Test_CPU%_List')
+
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.savefig(output_file, dpi=dpi, bbox_inches='tight')
+
+            print(f'Line chart saved as {output_file}')
+
+            # 删除中间文件
+            os.remove(intermediate_file)
+            print(f'Intermediate data file {intermediate_file} deleted.')
+
+        finally:
+            # 恢复原始的 stdout
+            sys.stdout = original_stdout
+
+    def on_text_written(self, text):
+        # 将输出信息追加到文本框
+        cursor = self.output_textbox.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+        cursor.insertText(text)
+        self.output_textbox.setTextCursor(cursor)
+        self.output_textbox.ensureCursorVisible()
+
+
+if __name__ == '__main__':
+    from PyQt5 import QtGui, QtCore
+
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
