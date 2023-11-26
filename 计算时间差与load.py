@@ -46,7 +46,56 @@ sum_data['File_Name'] = 'sum'
 df = pd.concat([df, sum_data], ignore_index=True)
 
 # 将处理后的数据保存到新的 Excel 文件
-output_file_path = r"C:\Users\一清\Desktop\CPU_Test1110\1124测试数据\processed_data_with_sum.xlsx"
+output_file_path = r"C:\Users\一清\Desktop\CPU_Test1110\1124测试数据\processed_data_test.xlsx"
 df.to_excel(output_file_path, index=False)
 
-print("数据处理完成，并已保存到:", output_file_path)
+print("前半部分数据处理完成，并已保存到:", output_file_path)
+
+# 以下是新增的功能
+
+# 定义处理 txt 文件的函数
+def process_txt(txt_file, selected_data, excel_file_path):
+    data = []
+    try:
+        with open(txt_file, 'r') as file:
+            for i, line in enumerate(file):
+                if i >= 10000:
+                    break
+                line = line.replace(" load average:", " ")
+                parts = line.split(" ", 1)
+                if len(parts) == 2:
+                    time = parts[0]
+                    data_parts = parts[1].split(",")
+                    if len(data_parts) == 3:
+                        data1 = float(data_parts[0])
+                        data2 = float(data_parts[1])
+                        data3 = float(data_parts[2])
+                        data.append({"time": time, "data1": data1, "data2": data2, "data3": data3})
+    except FileNotFoundError:
+        print(f"Error: File not found - {txt_file}")
+        return
+    except Exception as e:
+        print(f"Error processing file {txt_file}: {e}")
+        return
+
+    # Create a DataFrame from the processed data
+    df_txt = pd.DataFrame(data)
+
+    # Select the specified data column
+    selected_column = f"data{selected_data}"
+    df_txt['File_Name'] = 'load_average'
+    df_txt['Time'] = pd.to_datetime(df_txt['time']).dt.strftime('%H:%M:%S')
+    df_txt['CPU%'] = df_txt[selected_column]
+    df_txt = df_txt[['File_Name', 'Time', 'CPU%']]
+
+    # Append the processed txt data to the original Excel DataFrame
+    df_combined = pd.concat([df, df_txt], ignore_index=True)
+
+    # Save the combined DataFrame to the original Excel file
+    df_combined.to_excel(excel_file_path, index=False)
+
+# 选择要处理的 data 列
+selected_data = 1  # 选择 data1，可以修改为 2 或 3
+process_txt(r"C:\Users\一清\Desktop\CPU_Test1110\原始数据\sys_monitor_log20231124\load_average.txt", selected_data, output_file_path)
+
+print("处理后的 txt 数据已追加到:", output_file_path)

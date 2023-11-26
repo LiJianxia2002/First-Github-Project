@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 读取 Excel 文件
-excel_file = r'C:\Users\一清\Desktop\CPU_Test1110\1121测试数据\processed_data_with_sum.xlsx'
+excel_file = r'C:\Users\一清\Desktop\CPU_Test1110\1124测试数据\processed_data_test.xlsx'
 df = pd.read_excel(excel_file)
 
 # 删除包含 NaN 值的行
@@ -11,8 +11,8 @@ df.dropna(subset=['Time', 'CPU%', 'File_Name'], inplace=True)
 # 过滤掉时间以10开头的数据
 df['Time'] = pd.to_datetime(df['Time'], format='%H:%M:%S')
 
-start_time = '15:30:00'
-end_time = '15:40:00'
+start_time = '16:50:00'
+end_time = '17:20:00'
 
 df['Time'] = pd.to_datetime(df['Time'], format='%H:%M:%S')
 
@@ -58,6 +58,8 @@ for i, (label, group) in enumerate(df.groupby('File_Name')):
     
     if label == 'sum':
         ax.plot(x_values, y_values, marker='o', markersize=1, label=f'{label} (Avg: {group["Average_CPU"].iloc[0]:.2f}, Median: {group["Median_CPU"].iloc[0]:.2f})', linewidth=1.5, color=colors[i % len(colors)])
+    elif label == 'load_average':
+        ax.plot(x_values, y_values * 5, marker='o', markersize=1, label=f'{label} (Avg: {group["Average_CPU"].iloc[0]:.2f}, Median: {group["Median_CPU"].iloc[0]:.2f})', linewidth=2, color=colors[i % len(colors)])
     else:
         ax.plot(x_values, y_values, marker='o', markersize=1, label=f'{label} (Avg: {group["Average_CPU"].iloc[0]:.2f}, Median: {group["Median_CPU"].iloc[0]:.2f})', linewidth=0.5, color=colors[i % len(colors)])  # 使用曲线图，标记点为圆点
     
@@ -81,7 +83,7 @@ plt.title('ACU_Test_CPU%_List')
 ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')  # 将图例移到右上角
 
 # 保存图表为 PNG 文件
-output_file = r'C:\Users\一清\Desktop\CPU_Test1110\1121测试数据\test1121.png'
+output_file = r'C:\Users\一清\Desktop\CPU_Test1110\1124测试数据\test1124.png'
 plt.savefig(output_file, dpi=dpi, bbox_inches='tight')  # 使用 bbox_inches='tight' 确保保存整个图表
 
 print(f'Line chart saved as {output_file}')
