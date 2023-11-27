@@ -127,9 +127,9 @@ max_variance_file_names_top10 = (
 )
 
 # 打印结果
-print(max_variance_file_names_top10[:10])
+print(max_variance_file_names_top10)
 
-for File_Name in max_variance_file_names_top10[:10]:
+for File_Name in max_variance_file_names_top10:
     # 提取方差最大的 File_Name 对应的数据
     tmp = df[df['File_Name'] == File_Name]
 
@@ -172,25 +172,3 @@ for File_Name in max_variance_file_names_top10[:10]:
     plt.savefig(output_file, dpi=dpi, bbox_inches='tight')  # 使用 bbox_inches='tight' 确保保存整个图表
 
     print(f'Line chart saved as {output_file}')
-
-#手搓堆叠面积图！！！
-
-
-
-
-# 假设您有一个包含File_Name、Time和CPU%的DataFrame，命名为df
-# 假设您已经获得了前十大方差的File_Name列表，命名为max_variance_file_names_top10
-
-
-# 创建一个 DataFrame 用于保存 CPU% 数据
-result_df = pd.DataFrame({'Time': df['Time']})
-
-# 将每个 File_Name 的 CPU% 数据添加到 DataFrame
-for file_name in max_variance_file_names_top10:
-    subset = df[df['File_Name'] == file_name]
-    result_df[file_name] = subset['CPU%'].values
-
-# 保存结果到 Excel 文件
-output_file = r'C:\Users\一清\Desktop\CPU_Test1110\1125测试数据\output.xlsx'
-result_df.to_excel(output_file, index=False)
-print(f'Data saved as {output_file}')
